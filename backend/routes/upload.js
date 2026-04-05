@@ -99,6 +99,8 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "File is empty or could not be read" });
     }
 
+    console.log(`📄 Processing file: ${file.originalname} (${text.length} chars)`);
+
     // Save document record
     const docResult = await pool.query(
       "INSERT INTO documents (user_id, name) VALUES ($1, $2) RETURNING id",
@@ -108,16 +110,22 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     // Split into chunks
     const chunks = splitIntoChunks(text);
+    console.log(`✂️ Split into ${chunks.length} chunks`);
 
     // Generate embeddings and store chunks
-    for (const chunk of chunks) {
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`🧠 Generating embedding for chunk ${i + 1}/${chunks.length}...`);
       const embedding = await generateEmbedding(chunk);
+      
       const embeddingStr = `[${embedding.join(",")}]`;
       await pool.query(
         "INSERT INTO chunks (document_id, content, embedding) VALUES ($1, $2, $3::vector)",
         [documentId, chunk, embeddingStr]
       );
     }
+
+    console.log(`✅ File processing complete: ${file.originalname}`);
 
     res.json({
       message: "File uploaded and processed successfully",
@@ -128,7 +136,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Upload error:", err.message);
+    console.error("❌ Upload error:", err.message);
     res.status(500).json({ error: "Failed to process file: " + err.message });
   }
 });

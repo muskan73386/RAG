@@ -75,11 +75,16 @@ router.post("/chat", async (req, res) => {
       return res.status(400).json({ error: "Question is required" });
     }
 
+    console.log(`💬 New question from user ${userId}: "${question}"`);
+
     // Generate embedding for the query
     const queryEmbedding = await generateEmbedding(question);
+    console.log(`🧠 Generated query embedding (first 3): ${queryEmbedding.slice(0, 3)}...`);
+    
     const embeddingStr = `[${queryEmbedding.join(",")}]`;
 
     // Vector similarity search — top 5 most relevant chunks for this user's documents
+    console.log("🔍 Performing vector similarity search...");
     const searchResult = await pool.query(
       `SELECT c.content, c.document_id, d.name as doc_name
        FROM chunks c
@@ -90,8 +95,12 @@ router.post("/chat", async (req, res) => {
       [userId, embeddingStr]
     );
 
+    console.log(`📊 Found ${searchResult.rows.length} relevant chunks`);
+
     if (searchResult.rows.length === 0) {
-      const noDocsAnswer = "You haven't uploaded any documents yet. Please upload a document first.";
+      const noDocsAnswer = "No relevant data found. Please upload a document first.";
+      console.log("⚠️  No relevant chunks found in database.");
+      
       await pool.query(
         "INSERT INTO chats (user_id, question, answer) VALUES ($1, $2, $3)",
         [userId, question, noDocsAnswer]
@@ -104,8 +113,12 @@ router.post("/chat", async (req, res) => {
       .map((row, i) => `[Source: ${row.doc_name}]\n${row.content}`)
       .join("\n\n---\n\n");
 
+    console.log("📝 Context prepared for AI:", context.substring(0, 200) + "...");
+
     // Get AI answer
+    console.log("🤖 Requesting AI completion...");
     const answer = await chatCompletion(context, question);
+    console.log(`✨ AI Response: "${answer.substring(0, 100)}..."`);
 
     // Save to chat history
     await pool.query(
@@ -117,7 +130,7 @@ router.post("/chat", async (req, res) => {
     const sources = [...new Set(searchResult.rows.map((r) => r.doc_name))];
     res.json({ answer, sources });
   } catch (err) {
-    console.error("Chat error:", err.message);
+    console.error("❌ Chat error:", err.message);
     res.status(500).json({ error: "Failed to process question: " + err.message });
   }
 });
