@@ -3,9 +3,8 @@ services:
     name: rag-chat-backend
     env: node
     plan: free
-    buildCommand: npm install
-    startCommand: node server.js
-    rootDirectory: backend
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node server.js
     envVars:
       - key: NODE_VERSION
         value: 20
